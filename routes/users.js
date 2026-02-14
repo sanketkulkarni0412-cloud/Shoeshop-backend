@@ -81,4 +81,20 @@ router.get('/', async (req, res) => {
     }
 });
 
+// PUT Toggle User Status (Block/Unblock)
+router.put('/:uid/status', async (req, res) => {
+    try {
+        const { uid } = req.params;
+        const { status } = req.body; // 'active' or 'blocked'
+
+        if (db) {
+            await db.collection('users').doc(uid).update({ status });
+        }
+        res.json({ success: true, status });
+    } catch (error) {
+        console.error("Error updating user status:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 module.exports = router;

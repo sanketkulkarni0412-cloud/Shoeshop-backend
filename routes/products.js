@@ -31,36 +31,55 @@ router.get('/', async (req, res) => {
             return res.json(createdItems);
         }
 
-        const items = [];
+        let items = [];
         snapshot.forEach(doc => {
             items.push({ id: doc.id, ...doc.data() });
         });
-
-        // Filter logic (Server side filtering)
-        const { category, sale, search } = req.query;
-        let filtered = items;
+        // Apply in-memory filters
+        const { category, sale, search, minPrice, maxPrice } = req.query;
+        console.log("Filtering params:", { category, sale, search, minPrice, maxPrice });
 
         if (category) {
-            filtered = filtered.filter(p => p.category.toLowerCase() === category.toLowerCase());
+            items = items.filter(p => {
+                const cat = p.category;
+                if (typeof cat !== 'string') return false;
+                return cat.toLowerCase() === category.toLowerCase();
+            });
         }
 
         if (sale === 'true') {
-            filtered = filtered.filter(p => p.isSale);
+            items = items.filter(p => p.isSale);
         }
 
         if (search) {
-            const query = search.toLowerCase();
-            filtered = filtered.filter(p =>
-                p.name.toLowerCase().includes(query) ||
-                p.brand.toLowerCase().includes(query)
+            const lowerSearch = search.toLowerCase();
+            items = items.filter(p =>
+                (typeof p.name === 'string' && p.name.toLowerCase().includes(lowerSearch)) ||
+                (typeof p.brand === 'string' && p.brand.toLowerCase().includes(lowerSearch))
             );
         }
 
-        res.json(filtered);
+        // Apply Price Filter
+        if (minPrice || maxPrice) {
+            const min = parseFloat(minPrice);
+            const max = parseFloat(maxPrice);
+            console.log("Price filtering:", { min, max });
+
+            items = items.filter(p => {
+                const price = parseFloat(p.price);
+                if (isNaN(price)) return false;
+                const aboveMin = !isNaN(min) ? price >= min : true;
+                const belowMax = !isNaN(max) ? price <= max : true;
+                return aboveMin && belowMax;
+            });
+        }
+
+        console.log(`Returning ${items.length} products`);
+        res.json(items);
 
     } catch (error) {
         console.error('Error getting products:', error);
-        res.status(500).json({ error: 'Failed to fetch products' });
+        res.status(500).json({ error: 'Failed to fetch products: ' + error.message });
     }
 });
 

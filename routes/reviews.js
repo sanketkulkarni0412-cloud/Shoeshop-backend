@@ -27,6 +27,29 @@ router.get('/product/:productId', async (req, res) => {
     }
 });
 
+// GET reviews for a specific user
+router.get('/user/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const snapshot = await reviewsCollection
+            .where('userId', '==', userId)
+            .get();
+
+        const reviews = [];
+        snapshot.forEach(doc => {
+            reviews.push({ id: doc.id, ...doc.data() });
+        });
+
+        // Sort by date desc
+        reviews.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        res.json(reviews);
+    } catch (error) {
+        console.error('Error getting user reviews:', error);
+        res.status(500).json({ error: 'Failed to fetch user reviews' });
+    }
+});
+
 // ADMIN: GET all reviews (pending, approved, rejected)
 router.get('/admin/all', async (req, res) => {
     try {

@@ -2,6 +2,57 @@ const express = require('express');
 const router = express.Router();
 const { db } = require('../firebaseAdmin');
 
+// GET / - List all coupons
+router.get('/', async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'DB unavailable' });
+        const snapshot = await db.collection('coupons').get();
+        const coupons = [];
+        snapshot.forEach(doc => coupons.push({ id: doc.id, ...doc.data() }));
+        res.json(coupons);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST / - Create a new coupon
+router.post('/', async (req, res) => {
+    try {
+        const { code, type, value, expiryDate, usageLimit } = req.body;
+        if (!code || !type || !value) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        const newCoupon = {
+            code: code.toUpperCase(),
+            type, // 'percent' or 'flat'
+            value: Number(value),
+            expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
+            usageLimit: usageLimit ? Number(usageLimit) : null,
+            usedCount: 0,
+            isActive: true,
+            createdAt: new Date().toISOString()
+        };
+
+        const docRef = await db.collection('coupons').add(newCoupon);
+        res.json({ id: docRef.id, ...newCoupon });
+
+    } catch (error) {
+        console.error("Error creating coupon:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// DELETE /:id - Delete a coupon
+router.delete('/:id', async (req, res) => {
+    try {
+        await db.collection('coupons').doc(req.params.id).delete();
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // POST /validate
 router.post('/validate', async (req, res) => {
     try {

@@ -23,7 +23,7 @@ const IMAGES = {
     converse: "https://images.unsplash.com/photo-1607522370275-f14206abe5d3?auto=format&fit=crop&q=80&w=600",
     timberland: "https://images.unsplash.com/photo-1511556820780-dba9af74f9d5?auto=format&fit=crop&q=80&w=600",
     dr_martens: "https://images.unsplash.com/photo-1638361661645-a4f661001bc5?auto=format&fit=crop&q=80&w=600",
-    formal_oxford: "https://images.unsplash.com/photo-1614252369475-531eba835eb1?auto=format&fit=crop&q=80&w=600",
+    formal_oxford: "https://images.unsplash.com/photo-1560343090-f0409e92791a?auto=format&fit=crop&q=80&w=600",
     formal_loafer: "https://images.unsplash.com/photo-1533867617858-e7b97e060509?auto=format&fit=crop&q=80&w=600",
     running_asics: "https://images.unsplash.com/photo-1560769629-975ec94e6a86?auto=format&fit=crop&q=80&w=600",
     running_blue: "https://images.unsplash.com/photo-1460353581641-37baddab0fa2?auto=format&fit=crop&q=80&w=600",

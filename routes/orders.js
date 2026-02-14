@@ -269,4 +269,120 @@ router.put('/:id', async (req, res) => {
     }
 });
 
+// GET User Orders
+router.get('/user/:userId', async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not connected' });
+
+        const snapshot = await db.collection('orders')
+            .where('userId', '==', req.params.userId)
+            .get();
+
+        const orders = [];
+        snapshot.forEach(doc => orders.push({ id: doc.id, ...doc.data() }));
+
+        // Sort in memory to avoid Firestore Index requirement
+        orders.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        res.json(orders);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST Cancel Order
+router.post('/:id/cancel', async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not connected' });
+
+        const { reason } = req.body;
+        const orderRef = db.collection('orders').doc(req.params.id);
+
+        await db.runTransaction(async (t) => {
+            const doc = await t.get(orderRef);
+            if (!doc.exists) throw new Error('Order not found');
+
+            const order = doc.data();
+            if (['Delivered', 'Cancelled', 'Returned'].includes(order.status)) {
+                throw new Error('Order cannot be cancelled in current status');
+            }
+
+            // Refund logic
+            if (order.paymentStatus === 'Paid') {
+                const userRef = db.collection('users').doc(order.userId);
+                const userDoc = await t.get(userRef);
+
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    const wallet = userData.wallet || { balance: 0, transactions: [] };
+
+                    t.update(userRef, {
+                        wallet: {
+                            balance: (wallet.balance || 0) + order.total,
+                            transactions: [{
+                                id: `REF-${doc.id}-${Date.now()}`,
+                                type: 'credit',
+                                amount: order.total,
+                                description: `Refund for Cancelled Order #${order.customId || doc.id}`,
+                                date: new Date().toISOString()
+                            }, ...(wallet.transactions || [])]
+                        }
+                    });
+                }
+            }
+
+            t.update(orderRef, {
+                status: 'Cancelled',
+                refundStatus: order.paymentStatus === 'Paid' ? 'Refunded' : null,
+                history: [...(order.history || []), {
+                    previousStatus: order.status,
+                    newStatus: 'Cancelled',
+                    timestamp: new Date().toISOString(),
+                    updatedBy: 'User',
+                    reason: reason
+                }]
+            });
+        });
+
+        res.json({ message: 'Order cancelled successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// POST Return Order
+router.post('/:id/return', async (req, res) => {
+    try {
+        if (!db) return res.status(503).json({ error: 'Database not connected' });
+
+        const { reason } = req.body;
+        const orderRef = db.collection('orders').doc(req.params.id);
+
+        await db.runTransaction(async (t) => {
+            const doc = await t.get(orderRef);
+            if (!doc.exists) throw new Error('Order not found');
+
+            const order = doc.data();
+            if (order.status !== 'Delivered') {
+                throw new Error('Only delivered orders can be returned');
+            }
+
+            t.update(orderRef, {
+                status: 'Return Requested',
+                history: [...(order.history || []), {
+                    previousStatus: order.status,
+                    newStatus: 'Return Requested',
+                    timestamp: new Date().toISOString(),
+                    updatedBy: 'User',
+                    reason: reason
+                }]
+            });
+        });
+
+        res.json({ message: 'Return requested successfully' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 module.exports = router;
